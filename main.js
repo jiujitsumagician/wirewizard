@@ -56,7 +56,10 @@ async function createWindow() {
     try {
       await win.webContents.executeJavaScript("window.__ww_selftest()", true);
       const image = await win.webContents.capturePage();
-      fs.writeFileSync(path.join(__dirname, "test", "selftest-electron.png"), image.toPNG());
+      const outDir = fs.existsSync(path.join(__dirname, "test"))
+        ? path.join(__dirname, "test")
+        : require("node:os").tmpdir();
+      fs.writeFileSync(path.join(outDir, "selftest-electron.png"), image.toPNG());
       console.log("SELFTEST OK");
       app.exit(0);
     } catch (err) {

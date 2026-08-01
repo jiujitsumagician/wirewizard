@@ -47,6 +47,7 @@
     },
     "portable": {
       "artifactName": "WireWizard-${version}-portable.exe"
-    }
+    },
+    "asar": false
   }
 }
