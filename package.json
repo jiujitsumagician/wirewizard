@@ -1,0 +1,52 @@
+{
+  "name": "wirewizard",
+  "productName": "Wire Wizard",
+  "version": "1.0.0",
+  "description": "Floorplan markup for low-voltage contractors \u2014 cable runs, device drops, WiFi heatmaps, AI scale & wall detection, PDF export.",
+  "main": "main.js",
+  "license": "MIT",
+  "author": "DSIO Industries",
+  "scripts": {
+    "start": "electron .",
+    "serve": "node serve.mjs",
+    "smoke": "node test/smoke.mjs",
+    "dist": "electron-builder --win portable"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
+    "jspdf": "^3.0.3",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "devDependencies": {
+    "electron": "^38.2.0",
+    "electron-builder": "^26.0.12",
+    "playwright": "^1.60.0"
+  },
+  "build": {
+    "appId": "io.dsio.wirewizard",
+    "productName": "WireWizard",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "serve-lib.mjs",
+      "app/**/*",
+      "node_modules/@anthropic-ai/sdk/**/*",
+      "node_modules/jspdf/dist/**/*",
+      "node_modules/jspdf/package.json",
+      "node_modules/pdfjs-dist/build/**/*",
+      "node_modules/pdfjs-dist/package.json"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "app/icon.ico"
+    },
+    "portable": {
+      "artifactName": "WireWizard-${version}-portable.exe"
+    }
+  }
+}

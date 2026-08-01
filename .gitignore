@@ -1,0 +1,4 @@
+node_modules/
+dist/
+test/shots/
+test/selftest-electron.png
