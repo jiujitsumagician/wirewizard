@@ -120,7 +120,7 @@ button.danger { color: #ff9c9c; border-color: #6b2f2f; }
   display: flex; align-items: center; justify-content: center; z-index: 50;
 }
 /* the display:flex above would otherwise defeat the hidden attribute */
-#modal-backdrop[hidden], #toast[hidden], #props[hidden], #props-empty[hidden], #page-nav[hidden] { display: none; }
+#modal-backdrop[hidden], #toast[hidden], #props[hidden], #props-empty[hidden], #page-nav[hidden], #btn-clear-apikey[hidden] { display: none; }
 #settings-modal {
   background: var(--panel); border: 1px solid var(--edge); border-radius: 12px;
   padding: 22px 26px; width: 470px; max-width: 92vw;

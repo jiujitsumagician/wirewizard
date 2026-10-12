@@ -61,9 +61,17 @@ async function loadSettings() {
     catch {}
   }
 }
-async function persistSettings() {
-  if (bridge) await bridge.setSettings(state.settings);
-  else localStorage.setItem("ww-settings", JSON.stringify(state.settings));
+async function persistSettings(extra = {}) {
+  if (bridge) {
+    // In Electron the main process owns the API key (encrypted at rest). An
+    // empty key means "unchanged"; clearing is the explicit { clearApiKey: true }.
+    const r = await bridge.setSettings({ ...state.settings, ...extra });
+    state.settings.anthropicApiKey = "";
+    if (typeof r?.hasApiKey === "boolean") state.settings.hasApiKey = r.hasApiKey;
+  } else {
+    const { hasApiKey: _h, ...toStore } = state.settings;
+    localStorage.setItem("ww-settings", JSON.stringify(toStore));
+  }
 }
 
 /* ────────────────────────── undo ───────────────────────────── */
@@ -1277,8 +1285,27 @@ function escapeHtml(s) {
 
 /* settings modal */
 const backdrop = document.getElementById("modal-backdrop");
+// Electron: the stored key never reaches the renderer, so the field is
+// write-only (shows a "saved" placeholder). Browser mode keeps localStorage.
+function refreshApiKeyField() {
+  const input = document.getElementById("set-apikey");
+  const clearBtn = document.getElementById("btn-clear-apikey");
+  if (bridge) {
+    input.value = "";
+    input.placeholder = state.settings.hasApiKey ? "(saved) — type a new key to replace it" : "sk-ant-...";
+    clearBtn.hidden = !state.settings.hasApiKey;
+  } else {
+    input.value = state.settings.anthropicApiKey ?? "";
+    clearBtn.hidden = true;
+  }
+}
+document.getElementById("btn-clear-apikey").addEventListener("click", async () => {
+  await persistSettings({ clearApiKey: true });
+  refreshApiKeyField();
+  setStatus("Saved API key removed");
+});
 document.getElementById("btn-settings").addEventListener("click", () => {
-  document.getElementById("set-apikey").value = state.settings.anthropicApiKey ?? "";
+  refreshApiKeyField();
   document.getElementById("set-wallloss").value = state.settings.wallLossDb;
   document.getElementById("set-ple").value = state.settings.pathLossExp;
   document.getElementById("set-tx").value = state.settings.txAt1m;
