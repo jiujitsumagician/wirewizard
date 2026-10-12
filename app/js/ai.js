@@ -116,18 +116,24 @@ export async function analyzeFloorplan(pageCanvas, { apiKey } = {}) {
 
   // normalized (0-1000 of width) → image pixels
   const unit = pageCanvas.width / 1000;
-  const walls = (parsed.walls || []).map((w) => ({
-    x1: w.x1 * unit, y1: w.y1 * unit, x2: w.x2 * unit, y2: w.y2 * unit,
-  })).filter((w) => Math.hypot(w.x2 - w.x1, w.y2 - w.y1) > unit * 5);
+  const walls = (Array.isArray(parsed.walls) ? parsed.walls : []).map((w) => ({
+    x1: w?.x1 * unit, y1: w?.y1 * unit, x2: w?.x2 * unit, y2: w?.y2 * unit,
+  })).filter((w) => [w.x1, w.y1, w.x2, w.y2].every(Number.isFinite))
+    .filter((w) => Math.hypot(w.x2 - w.x1, w.y2 - w.y1) > unit * 5);
 
   // feet_per_unit is feet per (width/1000) px → ft/px = feet_per_unit / (width/1000)
-  const ftPerPx = parsed.scale?.feet_per_unit > 0
-    ? parsed.scale.feet_per_unit / (pageCanvas.width / 1000)
+  const ftPerUnit = parsed.scale?.feet_per_unit;
+  const ftPerPx = Number.isFinite(ftPerUnit) && ftPerUnit > 0
+    ? ftPerUnit / (pageCanvas.width / 1000)
     : null;
+
+  // The schema asks for this enum, but never trust model output: coerce it.
+  const CONFIDENCES = ["high", "medium", "low", "none"];
+  const scaleConfidence = CONFIDENCES.includes(parsed.scale?.confidence) ? parsed.scale.confidence : "none";
 
   return {
     ftPerPx,
-    scaleConfidence: parsed.scale?.confidence ?? "none",
+    scaleConfidence,
     scaleBasis: parsed.scale?.basis ?? "",
     walls,
     notes: parsed.notes ?? "",

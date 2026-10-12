@@ -2,7 +2,7 @@
 // Owns: window lifecycle, native file dialogs, settings persistence, and the
 // Claude API call for floorplan analysis (kept in main so the API key never
 // rides through renderer fetch and CORS never enters the picture).
-const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell, session } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
 
@@ -19,8 +19,24 @@ function loadSettings() {
   }
 }
 
+// The renderer only ever sends these keys (state.settings in app.js). Anything
+// else, or a value of the wrong type, is ignored rather than written to disk.
+function sanitizeSettingsPatch(patch) {
+  const clean = {};
+  if (!patch || typeof patch !== "object" || Array.isArray(patch)) return clean;
+  if (typeof patch.anthropicApiKey === "string" && patch.anthropicApiKey.length <= 512) {
+    clean.anthropicApiKey = patch.anthropicApiKey;
+  }
+  for (const k of ["wallLossDb", "pathLossExp", "txAt1m", "iconScale"]) {
+    if (typeof patch[k] === "number" && Number.isFinite(patch[k])) clean[k] = patch[k];
+  }
+  return clean;
+}
+
 function saveSettings(patch) {
-  const merged = { ...loadSettings(), ...patch };
+  const clean = sanitizeSettingsPatch(patch);
+  if (Object.keys(clean).length === 0) return loadSettings();
+  const merged = { ...loadSettings(), ...clean };
   fs.mkdirSync(path.dirname(settingsPath()), { recursive: true });
   fs.writeFileSync(settingsPath(), JSON.stringify(merged, null, 2));
   return merged;
@@ -46,9 +62,19 @@ async function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
   win.setMenuBarVisibility(false);
+  // Lock the window to the loopback origin: no popups, no off-origin
+  // navigation, no web permission prompts. The only external link goes
+  // through the ww:open-external IPC.
+  const origin = `http://127.0.0.1:${port}/`;
+  win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  win.webContents.on("will-navigate", (e, url) => {
+    if (!url.startsWith(origin)) e.preventDefault();
+  });
+  session.defaultSession.setPermissionRequestHandler((_wc, _permission, cb) => cb(false));
   await win.loadURL(`http://127.0.0.1:${port}/app/index.html`);
 
   // --selftest: load the demo plan, exercise the pipeline, capture a PNG, exit.
@@ -105,7 +131,11 @@ ipcMain.handle("ww:open-external", (_e, url) => {
 // ── IPC: Claude floorplan analysis ────────────────────────────
 // The renderer sends a downscaled PNG of the current page; Claude returns the
 // drawing scale and wall segments as strict JSON (schema-enforced).
-ipcMain.handle("ww:ai-analyze", async (_e, { pngBase64, prompt, schema }) => {
+ipcMain.handle("ww:ai-analyze", async (_e, { pngBase64, prompt, schema } = {}) => {
+  // The renderer downscales to <=1400px PNG (a few MB); cap generously.
+  if (typeof pngBase64 !== "string" || pngBase64.length > 64 * 1024 * 1024) {
+    return { error: "Invalid image payload." };
+  }
   const key = loadSettings().anthropicApiKey || process.env.ANTHROPIC_API_KEY || "";
   try {
     const Anthropic = require("@anthropic-ai/sdk");

@@ -984,7 +984,11 @@ function toast(msg, ms = 4200) {
 /* ─────────────────────── open/save/export ──────────────────── */
 
 async function openFloorplanBytes(name, bytes) {
-  if (/\.wirewiz$/i.test(name)) { await openProjectBytes(bytes); return; }
+  if (/\.wirewiz$/i.test(name)) {
+    try { await openProjectBytes(bytes); }
+    catch (err) { console.error(err); toast(`Could not open ${name}: ${err?.message ?? "invalid project file"}`); }
+    return;
+  }
   setStatus("Loading floorplan…");
   try {
     const pages = await loadFloorplan(name, bytes);
@@ -1039,9 +1043,16 @@ function serializeProject() {
 
 async function openProjectBytes(bytes) {
   const data = JSON.parse(new TextDecoder().decode(bytes));
-  if (data.app !== "wirewizard") throw new Error("Not a Wire Wizard project");
+  if (data?.app !== "wirewizard") throw new Error("Not a Wire Wizard project");
+  // Validate before use: a project file is untrusted input.
+  if (!Array.isArray(data.pages) || data.pages.length === 0) throw new Error("Invalid project");
+  const asArray = (x) => (Array.isArray(x) ? x : []);
   const pages = [];
   for (const pd of data.pages) {
+    // serializeProject always writes canvas.toDataURL("image/png"); refuse any other URL.
+    if (!pd || typeof pd.png !== "string" || !pd.png.startsWith("data:image/png;base64,")) {
+      throw new Error("Invalid project");
+    }
     const img = new Image();
     await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = pd.png; });
     const cv = document.createElement("canvas");
@@ -1049,15 +1060,19 @@ async function openProjectBytes(bytes) {
     cv.getContext("2d").drawImage(img, 0, 0);
     const p = newPage(cv, pd.label);
     Object.assign(p, {
-      ftPerPx: pd.ftPerPx, scaleSource: pd.scaleSource,
-      walls: pd.walls ?? [], aiWalls: pd.aiWalls ?? [],
-      items: pd.items ?? [], legendPos: pd.legendPos ?? null,
+      ftPerPx: Number.isFinite(pd.ftPerPx) && pd.ftPerPx > 0 ? pd.ftPerPx : null,
+      scaleSource: pd.scaleSource,
+      walls: asArray(pd.walls), aiWalls: asArray(pd.aiWalls),
+      items: asArray(pd.items), legendPos: pd.legendPos ?? null,
     });
     pages.push(p);
   }
   state.pages = pages;
-  state.cableTypes = data.cableTypes ?? state.cableTypes;
-  state.pageIndex = Math.min(data.pageIndex ?? 0, pages.length - 1);
+  const cableTypes = asArray(data.cableTypes).filter((c) =>
+    c && typeof c.id === "string" && typeof c.name === "string" &&
+    typeof c.color === "string" && /^#[0-9a-fA-F]{6}$/.test(c.color));
+  if (cableTypes.length) state.cableTypes = cableTypes;
+  state.pageIndex = Math.min(Number.isInteger(data.pageIndex) && data.pageIndex > 0 ? data.pageIndex : 0, pages.length - 1);
   state.sourceName = data.sourceName ?? "project";
   state.selection = null;
   invalidateHeatmap();
@@ -1243,7 +1258,7 @@ async function runAI() {
     document.getElementById("ai-notes").innerHTML =
       `<b>${res.walls.length}</b> wall segments traced.<br>` +
       `Scale: <b>${res.ftPerPx ? (res.ftPerPx * 12).toFixed(2) + '"/px' : "unknown"}</b> ` +
-      `(${res.scaleConfidence} — ${escapeHtml(res.scaleBasis)})<br>` +
+      `(${escapeHtml(res.scaleConfidence)} —${escapeHtml(res.scaleBasis)})<br>` +
       `<span class="dim">${escapeHtml(res.notes)}</span>`;
     setStatus(`AI: ${res.walls.length} walls, scale ${res.scaleConfidence}`);
     markDirty();

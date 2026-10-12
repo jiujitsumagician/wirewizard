@@ -10,6 +10,7 @@
     "start": "electron .",
     "serve": "node serve.mjs",
     "smoke": "node test/smoke.mjs",
+    "test:serve": "node test/serve-security.mjs",
     "dist": "electron-builder --win portable"
   },
   "dependencies": {
