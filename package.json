@@ -15,12 +15,12 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
-    "jspdf": "^3.0.3",
+    "jspdf": "^4.2.1",
     "pdfjs-dist": "^4.10.38"
   },
   "devDependencies": {
-    "electron": "^38.2.0",
-    "electron-builder": "^26.0.12",
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
     "playwright": "^1.60.0"
   },
   "build": {
