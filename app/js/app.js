@@ -1258,7 +1258,7 @@ async function runAI() {
     document.getElementById("ai-notes").innerHTML =
       `<b>${res.walls.length}</b> wall segments traced.<br>` +
       `Scale: <b>${res.ftPerPx ? (res.ftPerPx * 12).toFixed(2) + '"/px' : "unknown"}</b> ` +
-      `(${escapeHtml(res.scaleConfidence)} —${escapeHtml(res.scaleBasis)})<br>` +
+      `(${escapeHtml(res.scaleConfidence)} — ${escapeHtml(res.scaleBasis)})<br>` +
       `<span class="dim">${escapeHtml(res.notes)}</span>`;
     setStatus(`AI: ${res.walls.length} walls, scale ${res.scaleConfidence}`);
     markDirty();
